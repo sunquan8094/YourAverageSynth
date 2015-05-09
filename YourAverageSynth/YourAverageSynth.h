@@ -22,6 +22,13 @@ static CFStringRef kParamName_Two = CFSTR("Waveform 2");
 static CFStringRef kParamName_Two_Pitch = CFSTR("Pitch 2");
 static CFStringRef kParamName_Two_Volume = CFSTR("Volume 2");
 
+static CFStringRef kParamName_Three = CFSTR("Waveform 3");
+static CFStringRef kParamName_Three_Pitch = CFSTR("Pitch 3");
+static CFStringRef kParamName_Three_Volume = CFSTR("Volume 3");
+
+static CFStringRef kParamName_Master_Volume = CFSTR("Master Volume");
+static CFStringRef kParamName_Master_Pitch = CFSTR("Master Pitch");
+
 static const int kParamName_Sin = 0;
 static const int kParamName_Saw = 1;
 static const int kParamName_Sqr = 2;
@@ -44,8 +51,12 @@ enum Parameter {
     kParameter_Two_Pitch = 4,
     kParameter_Two_Volume = 5,
     
-    kParameter_Master_Volume = 6,
-    kParameter_Master_Pitch = 7,
+    kParameter_Three = 6,
+    kParameter_Three_Pitch = 7,
+    kParameter_Three_Volume = 8,
+    
+    kParameter_Master_Volume = 9,
+    kParameter_Master_Pitch = 10,
     
     kNumberOfParameters
 };
@@ -53,8 +64,8 @@ enum Parameter {
 // Define constants to identify factory presets.
 enum Preset {
     kPreset_Default = 0,
-    // kPreset_One  = 1,
-    // kPreset_Two  = 2,
+    kPreset_SawLead  = 1,
+    kPreset_Anthem  = 2,
     kNumberOfPresets
 };
 
@@ -74,7 +85,7 @@ struct YourAverageSynthNote : public SynthNote {
                             UInt32            inOutBusCount);
 
  private:
-    double phaseOne, phaseTwo, amp, maxamp;
+    double phaseOne, phaseTwo, phaseThree, amp, maxamp;
     double up_slope, dn_slope, fast_dn_slope;
 
 };

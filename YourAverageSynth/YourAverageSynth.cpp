@@ -46,9 +46,9 @@ AUDIOCOMPONENT_ENTRY(AUMusicDeviceFactory, YourAverageSynth)
 
 // Define the presets.
 static AUPreset kPresets[kNumberOfPresets] = {
-    { kPreset_Default, CFSTR("Saw Lead") },
-    // { kPreset_One, CFSTR("Preset One") },
-    // { kPreset_Two, CFSTR("Preset Two") },
+    { kPreset_Default, CFSTR("Default") },
+    { kPreset_SawLead, CFSTR("Saw Lead") },
+    { kPreset_Anthem, CFSTR("Anthem Chord Synth") },
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -175,7 +175,47 @@ OSStatus YourAverageSynth::GetParameterInfo(AudioUnitScope          inScope,
             info.maxValue = 64.00;
             info.defaultValue = 0.00;
             break;
-
+            
+        case kParameter_Three:
+            AUBase::FillInParameterName (info, kParamName_Three, false);
+            info.unit         = kAudioUnitParameterUnit_Indexed;
+            info.minValue     = 0;
+            info.maxValue     = 2;
+            info.defaultValue = 1;
+            break;
+            
+        case kParameter_Three_Volume:
+            AUBase::FillInParameterName (info, kParamName_Three_Volume, false);
+            info.unit = kAudioUnitParameterUnit_Percent;
+            info.minValue = 0;
+            info.maxValue = 100;
+            info.defaultValue = 100;
+            break;
+            
+        case kParameter_Three_Pitch:
+            AUBase::FillInParameterName(info, kParamName_Three_Pitch, false);
+            info.unit = kAudioUnitParameterUnit_RelativeSemiTones;
+            info.minValue = -64.00;
+            info.maxValue = 64.00;
+            info.defaultValue = 0.00;
+            break;
+        
+        case kParameter_Master_Volume:
+            AUBase::FillInParameterName(info, kParamName_Master_Volume, false);
+            info.unit = kAudioUnitParameterUnit_Percent;
+            info.minValue = 0;
+            info.maxValue = 100;
+            info.defaultValue = 100;
+            break;
+        
+        case kParameter_Master_Pitch:
+            AUBase::FillInParameterName(info, kParamName_Master_Pitch, false);
+            info.unit = kAudioUnitParameterUnit_RelativeSemiTones;
+            info.minValue = -64.00;
+            info.maxValue = 64.00;
+            info.defaultValue = 0.00;
+            break;
+            
         default:
             return kAudioUnitErr_InvalidParameter;
         }
@@ -197,6 +237,7 @@ bool YourAverageSynthNote::Attack(const MusicDeviceNoteParams &inParams)
     double sampleRate = SampleRate();
     phaseOne = 0.;
     phaseTwo = 0.;
+    phaseThree = 0.;
     maxamp = 0.4 * pow(inParams.mVelocity/127., 3.);
     amp = maxamp;
     up_slope = maxamp / (0.1 * sampleRate);
@@ -254,8 +295,22 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
     right = numChans == 2 ? (float*)inBufferList[bus0]->mBuffers[1].mData : 0;
 
     double sampleRate = SampleRate();
-    double freqOne = Frequency() * pow(2.0, (GetGlobalParameter(kParameter_One_Pitch)) / 12.0) * (1 / sampleRate);
-    double freqTwo = Frequency() * pow(2.0, (GetGlobalParameter(kParameter_Two_Pitch)) / 12.0) * (1 / sampleRate);
+    double masterPitchFactor = pow(2.0, (GetGlobalParameter(kParameter_Master_Pitch)) / 12.0);
+    double freqOne = Frequency() * pow(2.0, (GetGlobalParameter(kParameter_One_Pitch)) / 12.0) * (1 / sampleRate) * masterPitchFactor;
+    double freqTwo = Frequency() * pow(2.0, (GetGlobalParameter(kParameter_Two_Pitch)) / 12.0) * (1 / sampleRate) * masterPitchFactor;
+    double freqThree = Frequency() * pow(2.0, (GetGlobalParameter(kParameter_Three_Pitch)) / 12.0) * (1 / sampleRate) * masterPitchFactor;
+    
+    double volFactorOne = (double) GetGlobalParameter(kParameter_One_Volume) / 100.0;
+    double volFactorTwo = (double) GetGlobalParameter(kParameter_Two_Volume) / 100.0;
+    double volFactorThree = (double) GetGlobalParameter(kParameter_Three_Volume) / 100.0;
+    
+    double cumFactor = pow(volFactorOne, 2.0) + pow(volFactorTwo, 2.0) + pow(volFactorThree, 2.0);
+    
+    double volTakeupOne = volFactorOne / cumFactor;
+    double volTakeupTwo = volFactorTwo / cumFactor;
+    double volTakeupThree = volFactorThree / cumFactor;
+    
+    double masterVolFactor = pow((double)(GetGlobalParameter(kParameter_Master_Volume) / 100.0), 2.0);
         
 #if DEBUG_PRINT_RENDER
     printf("YourAverageSynthNote::Render %p %d %g %g %g\n",
@@ -271,7 +326,8 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             if (amp < maxamp)
                 amp += up_slope;
             
-            float sp_uno, sp_dos;
+            float sp_uno, sp_dos, sp_three;
+            
             if (GetGlobalParameter(kParameter_One) == kParamName_Saw) {
                 sp_uno = phaseOne - floorf(phaseOne);
             }
@@ -281,7 +337,8 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             else if (GetGlobalParameter(kParameter_One) == kParamName_Sqr) {
                 sp_uno = (sinf(2 * M_PI * phaseOne) >= 0) ? 1 : -1;
             }
-            sp_uno *= pow((double)(GetGlobalParameter(kParameter_One_Volume) / 100.0), 2.0);
+            
+            sp_uno *= pow(volTakeupOne, 1.0);
             
             if (GetGlobalParameter(kParameter_Two) == kParamName_Saw) {
                 sp_dos = (phaseTwo - floorf(phaseTwo));
@@ -292,17 +349,35 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             else if (GetGlobalParameter(kParameter_Two) == kParamName_Sqr) {
                 sp_dos = (sinf(2 * M_PI * phaseTwo) >= 0) ? 1 : -1;
             }
-            sp_dos *= pow((double)(GetGlobalParameter(kParameter_Two_Volume) / 100.0), 2.0);
-            float sp = (1.0 / sqrt(2.0)) * (sp_uno + sp_dos);
+            
+            sp_dos *= pow(volTakeupTwo, 1.0);
+            
+            if (GetGlobalParameter(kParameter_Three) == kParamName_Saw) {
+                sp_three = (phaseThree - floorf(phaseThree));
+            }
+            else if (GetGlobalParameter(kParameter_Three) == kParamName_Sin) {
+                sp_three = sinf(2 * M_PI * phaseThree);
+            }
+            else if (GetGlobalParameter(kParameter_Three) == kParamName_Sqr) {
+                sp_three = (sinf(2 * M_PI * phaseThree) >= 0) ? 1 : -1;
+            }
+            
+            sp_three *= pow(volTakeupThree, 1.0);
+            
+            float sp = (sp_uno + sp_dos + sp_three);
+            
             float sp2 = sp * sp;
             float sp5 = sp2 * sp2 * sp;
-            float out = sp5 * amp;
+            float out = sp5 * amp * masterVolFactor;
             phaseOne += freqOne;
             if (phaseOne > 1)
                 phaseOne -= 1;
             phaseTwo += freqTwo;
             if (phaseTwo > 1)
                 phaseTwo -= 1;
+            phaseThree += freqThree;
+            if (phaseThree > 1)
+                phaseThree -= 1;
             left[frame] += out;
             if (right)
                 right[frame] += out;
@@ -315,7 +390,9 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             for (UInt32 frame = 0; frame < inNumFrames; frame++) {
                 if (endFrame == 0xFFFFFFFF)
                     endFrame = frame;
-                float sp_uno, sp_dos;
+                
+                float sp_uno, sp_dos, sp_three;
+                
                 if (GetGlobalParameter(kParameter_One) == kParamName_Saw) {
                     sp_uno = phaseOne - floorf(phaseOne);
                 }
@@ -325,7 +402,8 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 else if (GetGlobalParameter(kParameter_One) == kParamName_Sqr) {
                     sp_uno = (sinf(2 * M_PI * phaseOne) >= 0) ? 1 : -1;
                 }
-                sp_uno *= pow((double)(GetGlobalParameter(kParameter_One_Volume) / 100.0), 2.0);
+                
+                sp_uno *= pow(volTakeupOne, 1.0);
                 
                 if (GetGlobalParameter(kParameter_Two) == kParamName_Saw) {
                     sp_dos = (phaseTwo - floorf(phaseTwo));
@@ -336,17 +414,35 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 else if (GetGlobalParameter(kParameter_Two) == kParamName_Sqr) {
                     sp_dos = (sinf(2 * M_PI * phaseTwo) >= 0) ? 1 : -1;
                 }
-                sp_dos *= pow((double)(GetGlobalParameter(kParameter_Two_Volume) / 100.0), 2.0);
-                float sp = (1.0 / sqrt(2.0)) * (sp_uno + sp_dos);
+                
+                sp_dos *= pow(volTakeupTwo, 1.0);
+                
+                if (GetGlobalParameter(kParameter_Three) == kParamName_Saw) {
+                    sp_three = (phaseThree - floorf(phaseThree));
+                }
+                else if (GetGlobalParameter(kParameter_Three) == kParamName_Sin) {
+                    sp_three = sinf(2 * M_PI * phaseThree);
+                }
+                else if (GetGlobalParameter(kParameter_Three) == kParamName_Sqr) {
+                    sp_three = (sinf(2 * M_PI * phaseThree) >= 0) ? 1 : -1;
+                }
+                
+                sp_three *= pow(volTakeupThree, 1.0);
+                
+                float sp = (sp_uno + sp_dos + sp_three);
+                
                 float sp2 = sp * sp;
                 float sp5 = sp2 * sp2 * sp;
-                float out = sp5 * amp;
+                float out = sp5 * amp * masterVolFactor;
                 phaseOne += freqOne;
                 if (phaseOne > 1)
                     phaseOne -= 1;
                 phaseTwo += freqTwo;
                 if (phaseTwo > 1)
                     phaseTwo -= 1;
+                phaseThree += freqThree;
+                if (phaseThree > 1)
+                    phaseThree -= 1;
                 left[frame] += out;
                 if (right)
                     right[frame] += out;
@@ -370,7 +466,7 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 else if (endFrame == 0xFFFFFFFF)
                     endFrame = frame;
                 
-                float sp_uno, sp_dos;
+                float sp_uno, sp_dos, sp_three;
                 
                 if (GetGlobalParameter(kParameter_One) == kParamName_Saw) {
                     sp_uno = phaseOne - floorf(phaseOne);
@@ -381,7 +477,8 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 else if (GetGlobalParameter(kParameter_One) == kParamName_Sqr) {
                     sp_uno = (sinf(2 * M_PI * phaseOne) >= 0) ? 1 : -1;
                 }
-                sp_uno *= pow((double)(GetGlobalParameter(kParameter_One_Volume) / 100.0), 2.0);
+                
+                sp_uno *= pow(volTakeupOne, 1.0);
                 
                 if (GetGlobalParameter(kParameter_Two) == kParamName_Saw) {
                     sp_dos = (phaseTwo - floorf(phaseTwo));
@@ -392,18 +489,35 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 else if (GetGlobalParameter(kParameter_Two) == kParamName_Sqr) {
                     sp_dos = (sinf(2 * M_PI * phaseTwo) >= 0) ? 1 : -1;
                 }
-                sp_dos *= pow((double)(GetGlobalParameter(kParameter_Two_Volume) / 100.0), 2.0);
                 
-                float sp = (1.0 / sqrt(2.0)) * (sp_uno + sp_dos);
+                sp_dos *= pow(volTakeupTwo, 1.0);
+                
+                if (GetGlobalParameter(kParameter_Three) == kParamName_Saw) {
+                    sp_three = (phaseThree - floorf(phaseThree));
+                }
+                else if (GetGlobalParameter(kParameter_Three) == kParamName_Sin) {
+                    sp_three = sinf(2 * M_PI * phaseThree);
+                }
+                else if (GetGlobalParameter(kParameter_Three) == kParamName_Sqr) {
+                    sp_three = (sinf(2 * M_PI * phaseThree) >= 0) ? 1 : -1;
+                }
+                
+                sp_three *= pow(volTakeupThree, 1.0);
+                
+                float sp = (sp_uno + sp_dos + sp_three);
+                
                 float sp2 = sp * sp;
                 float sp5 = sp2 * sp2 * sp;
-                float out = sp5 * amp;
+                float out = sp5 * amp * masterVolFactor;
                 phaseOne += freqOne;
                 if (phaseOne > 1)
                     phaseOne -= 1;
                 phaseTwo += freqTwo;
                 if (phaseTwo > 1)
                     phaseTwo -= 1;
+                phaseThree += freqThree;
+                if (phaseThree > 1)
+                    phaseThree -= 1;
                 left[frame] += out;
                 if (right)
                     right[frame] += out;
@@ -426,7 +540,7 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
 }
 
 OSStatus YourAverageSynth::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParameterID id, CFArrayRef *outStrings) {
-    if (scope == kAudioUnitScope_Global && (id == kParameter_One || id == kParameter_Two)) {
+    if (scope == kAudioUnitScope_Global && (id == kParameter_One || id == kParameter_Two || id == kParameter_Three)) {
         if (outStrings == NULL) return noErr;
         CFStringRef strings [] = { kMenuItem_Sin, kMenuItem_Saw, kMenuItem_Sqr};
         *outStrings = CFArrayCreate (NULL, (const void **) strings, (sizeof (strings) / sizeof (strings [0])), NULL);
