@@ -28,11 +28,16 @@ static CFStringRef kParamName_Three_Volume = CFSTR("Volume 3");
 
 static CFStringRef kParamName_Master_Volume = CFSTR("Master Volume");
 static CFStringRef kParamName_Master_Pitch = CFSTR("Master Pitch");
+static CFStringRef kParamName_Master_FilterType = CFSTR("Master Filter Type");
+static CFStringRef kParamName_Master_FilterCutoff = CFSTR("Master Filter Cutoff");
 
 static const int kParamName_Sin = 0;
 static const int kParamName_Saw = 1;
 static const int kParamName_Sqr = 2;
 static const int kDefault_Wav = 1;
+
+static const int kParamName_lp = 0;
+static const int kParamName_hp = 1;
 
 static const float kDefault_Pitch = 0.0;
 static const int kDefault_Volume = 100;
@@ -40,6 +45,9 @@ static const int kDefault_Volume = 100;
 static CFStringRef kMenuItem_Sin = CFSTR("Sine");
 static CFStringRef kMenuItem_Saw = CFSTR("Saw");
 static CFStringRef kMenuItem_Sqr = CFSTR("Square");
+
+static CFStringRef kMenuItem_Lowpass = CFSTR("Lowpass");
+static CFStringRef kMenuItem_Highpass = CFSTR("Highpass");
 
 // Define constants to identify the parameters.
 enum Parameter {
@@ -57,6 +65,8 @@ enum Parameter {
     
     kParameter_Master_Volume = 9,
     kParameter_Master_Pitch = 10,
+    kParameter_Master_FilterType = 11,
+    kParameter_Master_FilterCutoff = 12,
     
     kNumberOfParameters
 };

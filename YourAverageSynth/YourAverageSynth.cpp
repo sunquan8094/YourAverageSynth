@@ -216,6 +216,22 @@ OSStatus YourAverageSynth::GetParameterInfo(AudioUnitScope          inScope,
             info.defaultValue = 0.00;
             break;
             
+        case kParameter_Master_FilterType:
+            AUBase::FillInParameterName(info, kParamName_Master_FilterType, false);
+            info.unit = kAudioUnitParameterUnit_Indexed;
+            info.minValue = 0;
+            info.maxValue = 1;
+            info.defaultValue = 0;
+            break;
+            
+        case kParameter_Master_FilterCutoff:
+            AUBase::FillInParameterName(info, kParamName_Master_FilterCutoff, false);
+            info.unit = kAudioUnitParameterUnit_Hertz;
+            info.minValue = 20;
+            info.maxValue = 20000;
+            info.defaultValue = 20;
+            break;
+
         default:
             return kAudioUnitErr_InvalidParameter;
         }
@@ -238,7 +254,7 @@ bool YourAverageSynthNote::Attack(const MusicDeviceNoteParams &inParams)
     phaseOne = 0.;
     phaseTwo = 0.;
     phaseThree = 0.;
-    maxamp = 0.4 * pow(inParams.mVelocity/127., 3.);
+    maxamp = 0.8 * pow(inParams.mVelocity/127., 3.);
     amp = maxamp;
     up_slope = maxamp / (0.1 * sampleRate);
     dn_slope = -maxamp / (0.9 * sampleRate);
@@ -311,6 +327,7 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
     double volTakeupThree = volFactorThree / cumFactor;
     
     double masterVolFactor = pow((double)(GetGlobalParameter(kParameter_Master_Volume) / 100.0), 2.0);
+    
         
 #if DEBUG_PRINT_RENDER
     printf("YourAverageSynthNote::Render %p %d %g %g %g\n",
@@ -321,7 +338,9 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
     case kNoteState_Attacked :
     case kNoteState_Sostenutoed :
     case kNoteState_ReleasedButSostenutoed :
-    case kNoteState_ReleasedButSustained :
+        case kNoteState_ReleasedButSustained : {
+        float buf0 = 0.0;
+        float buf1 = 0.0;
         for (UInt32 frame = 0; frame < inNumFrames; frame++) {
             if (amp < maxamp)
                 amp += up_slope;
@@ -369,6 +388,16 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             float sp2 = sp * sp;
             float sp5 = sp2 * sp2 * sp;
             float out = sp5 * amp * masterVolFactor;
+            
+            buf0 += GetGlobalParameter(kParameter_Master_FilterCutoff) / 20000.0 * (out - buf0);
+            buf1 += GetGlobalParameter(kParameter_Master_FilterCutoff) / 20000.0 * (buf0 - buf1);
+            if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_lp) {
+                out = buf1;
+            }
+            else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_hp) {
+                out = out - buf1;
+            }
+            
             phaseOne += freqOne;
             if (phaseOne > 1)
                 phaseOne -= 1;
@@ -382,11 +411,14 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             if (right)
                 right[frame] += out;
         }
+        }
         break;
             
     case kNoteState_Released :
         {
             UInt32 endFrame = 0xFFFFFFFF;
+            float buf0 = 0.0;
+            float buf1 = 0.0;
             for (UInt32 frame = 0; frame < inNumFrames; frame++) {
                 if (endFrame == 0xFFFFFFFF)
                     endFrame = frame;
@@ -434,6 +466,16 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 float sp2 = sp * sp;
                 float sp5 = sp2 * sp2 * sp;
                 float out = sp5 * amp * masterVolFactor;
+
+                buf0 += GetGlobalParameter(kParameter_Master_FilterCutoff) / 20000.0 * (out - buf0);
+                buf1 += GetGlobalParameter(kParameter_Master_FilterCutoff) / 20000.0 * (buf0 - buf1);
+                if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_lp) {
+                    out = buf1;
+                }
+                else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_hp) {
+                    out = out - buf1;
+                }
+                
                 phaseOne += freqOne;
                 if (phaseOne > 1)
                     phaseOne -= 1;
@@ -460,6 +502,8 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
     case kNoteState_FastReleased :
         {
             UInt32 endFrame = 0xFFFFFFFF;
+            float buf0 = 0.0;
+            float buf1 = 0.0;
             for (UInt32 frame = 0; frame < inNumFrames; ++frame) {
                 if (amp > 0.0)
                     amp += fast_dn_slope;
@@ -509,6 +553,16 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 float sp2 = sp * sp;
                 float sp5 = sp2 * sp2 * sp;
                 float out = sp5 * amp * masterVolFactor;
+                
+                buf0 += GetGlobalParameter(kParameter_Master_FilterCutoff) / 20000.0 * (out - buf0);
+                buf1 += GetGlobalParameter(kParameter_Master_FilterCutoff) / 20000.0 * (buf0 - buf1);
+                if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_lp) {
+                    out = buf1;
+                }
+                else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_hp) {
+                    out = out - buf1;
+                }
+                
                 phaseOne += freqOne;
                 if (phaseOne > 1)
                     phaseOne -= 1;
@@ -543,6 +597,12 @@ OSStatus YourAverageSynth::GetParameterValueStrings(AudioUnitScope scope, AudioU
     if (scope == kAudioUnitScope_Global && (id == kParameter_One || id == kParameter_Two || id == kParameter_Three)) {
         if (outStrings == NULL) return noErr;
         CFStringRef strings [] = { kMenuItem_Sin, kMenuItem_Saw, kMenuItem_Sqr};
+        *outStrings = CFArrayCreate (NULL, (const void **) strings, (sizeof (strings) / sizeof (strings [0])), NULL);
+        return noErr;
+    }
+    else if (scope == kAudioUnitScope_Global && (id == kParameter_Master_FilterType)) {
+        if (outStrings == NULL) return noErr;
+        CFStringRef strings [] = { kMenuItem_Lowpass, kMenuItem_Highpass};
         *outStrings = CFArrayCreate (NULL, (const void **) strings, (sizeof (strings) / sizeof (strings [0])), NULL);
         return noErr;
     }
