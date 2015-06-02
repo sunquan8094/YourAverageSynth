@@ -4,4 +4,4 @@ This project is for experimental purposes. Please notify me by email at sunquan8
 
 Here is the list of what I have so far up until the latest commit:
 - saw, sine, and square waveforms
-- lowpass and highpass filters, bandpass filter to come soon
+- simple lowpass, highpass, and bandpass filters
