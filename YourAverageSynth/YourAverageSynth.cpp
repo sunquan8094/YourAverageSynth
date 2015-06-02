@@ -397,6 +397,9 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
             else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_hp) {
                 out = out - buf1;
             }
+            else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_bp) {
+                out = buf0 - buf1;
+            }
             
             phaseOne += freqOne;
             if (phaseOne > 1)
@@ -474,6 +477,9 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 }
                 else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_hp) {
                     out = out - buf1;
+                }
+                else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_bp) {
+                    out = buf0 - buf1;
                 }
                 
                 phaseOne += freqOne;
@@ -562,6 +568,9 @@ OSStatus YourAverageSynthNote::Render(UInt64           inAbsoluteSampleFrame,
                 else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_hp) {
                     out = out - buf1;
                 }
+                else if (GetGlobalParameter(kParameter_Master_FilterType) == kParamName_bp) {
+                    out = buf0 - buf1;
+                }
                 
                 phaseOne += freqOne;
                 if (phaseOne > 1)
@@ -602,7 +611,7 @@ OSStatus YourAverageSynth::GetParameterValueStrings(AudioUnitScope scope, AudioU
     }
     else if (scope == kAudioUnitScope_Global && (id == kParameter_Master_FilterType)) {
         if (outStrings == NULL) return noErr;
-        CFStringRef strings [] = { kMenuItem_Lowpass, kMenuItem_Highpass};
+        CFStringRef strings [] = { kMenuItem_Lowpass, kMenuItem_Highpass, kMenuItem_Bandpass};
         *outStrings = CFArrayCreate (NULL, (const void **) strings, (sizeof (strings) / sizeof (strings [0])), NULL);
         return noErr;
     }

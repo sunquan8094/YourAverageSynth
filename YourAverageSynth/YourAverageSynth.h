@@ -38,6 +38,7 @@ static const int kDefault_Wav = 1;
 
 static const int kParamName_lp = 0;
 static const int kParamName_hp = 1;
+static const int kParamName_bp = 2;
 
 static const float kDefault_Pitch = 0.0;
 static const int kDefault_Volume = 100;
@@ -48,6 +49,7 @@ static CFStringRef kMenuItem_Sqr = CFSTR("Square");
 
 static CFStringRef kMenuItem_Lowpass = CFSTR("Lowpass");
 static CFStringRef kMenuItem_Highpass = CFSTR("Highpass");
+static CFStringRef kMenuItem_Bandpass = CFSTR("Bandpass");
 
 // Define constants to identify the parameters.
 enum Parameter {

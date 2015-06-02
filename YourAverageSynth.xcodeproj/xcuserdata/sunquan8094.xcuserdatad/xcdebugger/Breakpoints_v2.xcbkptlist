@@ -14,9 +14,7 @@
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "82"
-            endingLineNumber = "82"
-            landmarkName = "Render(UInt64 inAbsoluteSampleFrame, UInt32 inNumFrames, AudioBufferList** inBufferList, UInt32 inOutBusCount)"
-            landmarkType = "6">
+            endingLineNumber = "82">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
